@@ -221,10 +221,11 @@ class DiagnosticSession:
             raise InvalidTransition("Review requires an architecture draft")
         if self.recommendation is None:
             raise InvalidTransition("Review requires a recommendation")
+        reviewer_actor = reviewer.role
         if self.status != WorkflowStatus.REVIEW:
             self._transition(
                 WorkflowStatus.REVIEW,
-                actor="MockReviewer",
+                actor=reviewer_actor,
                 action="START_REVIEW",
             )
         try:
@@ -236,7 +237,7 @@ class DiagnosticSession:
             )
         except MockOutputError as exc:
             self.findings = []
-            self.fail(str(exc), actor="MockReviewer")
+            self.fail(str(exc), actor=reviewer_actor)
             return
 
         material = [
@@ -248,7 +249,7 @@ class DiagnosticSession:
         if material and self.revision_count == 0:
             self._transition(
                 WorkflowStatus.REVISION_REQUIRED,
-                actor="MockReviewer",
+                actor=reviewer_actor,
                 action="RAISE_MATERIAL_FINDING",
                 notes=f"{len(material)} material finding(s).",
             )
@@ -257,14 +258,14 @@ class DiagnosticSession:
                 finding.resolution_status = ResolutionStatus.HUMAN_ADJUDICATION
             self._transition(
                 WorkflowStatus.MANUAL_REVIEW,
-                actor="MockReviewer",
+                actor=reviewer_actor,
                 action="ESCALATE_AFTER_MAX_REVISION",
                 notes="No second automated revision is permitted.",
             )
         else:
             self._transition(
                 WorkflowStatus.READY_FOR_APPROVAL,
-                actor="MockReviewer",
+                actor=reviewer_actor,
                 action="REVIEW_COMPLETE",
             )
 

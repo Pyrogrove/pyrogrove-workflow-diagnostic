@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
+from src.pyrogrove_diagnostic.deepseek_reviewer import (
+    DEEPSEEK_MODEL,
+    DeepSeekReviewer,
+)
 from src.pyrogrove_diagnostic.extraction import MockExtractor, MockOutputError
 from src.pyrogrove_diagnostic.models import (
     CriterionOutcome,
@@ -82,6 +88,8 @@ def _init_state() -> None:
         st.session_state.session = None
     if "ui_error" not in st.session_state:
         st.session_state.ui_error = None
+    if "live_review_result" not in st.session_state:
+        st.session_state.live_review_result = None
 
 
 def _load_case(case_id: str) -> None:
@@ -89,6 +97,7 @@ def _load_case(case_id: str) -> None:
     st.session_state.draft_case = get_synthetic_case(case_id)
     st.session_state.session = None
     st.session_state.ui_error = None
+    st.session_state.live_review_result = None
 
 
 def _fail_extraction(case_id: str, reason: str) -> None:
@@ -101,6 +110,41 @@ def _fail_extraction(case_id: str, reason: str) -> None:
     session.start_discovery()
     session.fail(reason, actor="MockExtractor")
     st.session_state.session = session
+
+
+def _run_selected_reviewer(
+    session: DiagnosticSession,
+    *,
+    reviewer_mode: ReviewerMode,
+    invalid_reviewer_output: bool,
+) -> None:
+    st.session_state.live_review_result = None
+    if reviewer_mode == ReviewerMode.LIVE_DEEPSEEK:
+        if session.qualification is None:
+            raise InvalidTransition("Live review requires a qualification result")
+        reviewer = DeepSeekReviewer(
+            api_key=os.getenv("DEEPSEEK_API_KEY"),
+            qualification=session.qualification,
+        )
+        session.run_review(reviewer, mode=ReviewerMode.LIVE_DEEPSEEK)
+        if reviewer.last_result is not None:
+            result = reviewer.last_result
+            st.session_state.live_review_result = result.model_dump(mode="json")
+            session.audit.record(
+                case_id=session.case.case_id,
+                actor=reviewer.role,
+                action="LIVE_REVIEW_CALLED_AND_VALIDATED",
+                from_status=session.status,
+                to_status=session.status,
+                notes=(
+                    f"Validated decision: {result.decision.value}; "
+                    f"severity: {result.severity.value}."
+                ),
+            )
+        return
+
+    mode = ReviewerMode.INVALID if invalid_reviewer_output else reviewer_mode
+    session.run_review(MockReviewer(), mode=mode)
 
 
 _init_state()
@@ -130,9 +174,26 @@ with st.sidebar:
                 mode.value for mode in ReviewerMode if mode != ReviewerMode.INVALID
             ],
             index=0,
-            help="HIGH_ONCE proves exactly one controlled revision. HIGH_ALWAYS proves escalation.",
+            help=(
+                "HIGH_ONCE proves exactly one controlled revision. HIGH_ALWAYS "
+                "proves escalation. LIVE_DEEPSEEK calls the bounded live reviewer."
+            ),
         )
     )
+
+if reviewer_mode == ReviewerMode.LIVE_DEEPSEEK:
+    st.warning(
+        "This mode uses a live DeepSeek reviewer. Deterministic qualification and "
+        "human release approval remain authoritative."
+    )
+    st.markdown("**Live reviewer provider:** DeepSeek")
+    st.markdown(f"**Model:** {DEEPSEEK_MODEL}")
+    live_result = st.session_state.live_review_result
+    if live_result is not None:
+        st.markdown(f"**Validated decision:** {live_result['decision']}")
+        st.markdown(f"**Severity:** {live_result['severity']}")
+        st.markdown(f"**Finding:** {live_result['finding']}")
+        st.markdown(f"**Recommended change:** {live_result['recommended_change']}")
 
 case: WorkflowCase = st.session_state.draft_case
 narrative = st.text_area(
@@ -152,6 +213,7 @@ if st.button("1. Run deterministic MockExtractor", type="primary"):
         st.session_state.draft_case = extracted
         st.session_state.session = None
         st.session_state.ui_error = None
+        st.session_state.live_review_result = None
     except MockOutputError as exc:
         _fail_extraction(st.session_state.selected_case_id, str(exc))
     st.rerun()
@@ -259,6 +321,7 @@ if confirm:
         st.session_state.draft_case = updated_case
         st.session_state.session = session
         st.session_state.ui_error = None
+        st.session_state.live_review_result = None
     except (ValueError, InvalidTransition) as exc:
         st.session_state.ui_error = str(exc)
     st.rerun()
@@ -308,12 +371,11 @@ if session is not None:
                     invalid_output=invalid_stage == "Architect output",
                 )
                 if session.status != WorkflowStatus.FAILED:
-                    mode = (
-                        ReviewerMode.INVALID
-                        if invalid_stage == "Reviewer output"
-                        else reviewer_mode
+                    _run_selected_reviewer(
+                        session,
+                        reviewer_mode=reviewer_mode,
+                        invalid_reviewer_output=invalid_stage == "Reviewer output",
                     )
-                    session.run_review(MockReviewer(), mode=mode)
             except InvalidTransition as exc:
                 st.session_state.ui_error = str(exc)
             st.rerun()
@@ -338,7 +400,11 @@ if session is not None:
         if st.button("4. Apply the one permitted controlled revision"):
             session.revise_once()
             if session.status == WorkflowStatus.ARCHITECTURE_DRAFT:
-                session.run_review(MockReviewer(), mode=reviewer_mode)
+                _run_selected_reviewer(
+                    session,
+                    reviewer_mode=reviewer_mode,
+                    invalid_reviewer_output=False,
+                )
             st.rerun()
 
     if session.status == WorkflowStatus.READY_FOR_APPROVAL:

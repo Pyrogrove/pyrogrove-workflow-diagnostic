@@ -84,7 +84,40 @@ class ReviewerMode(StrEnum):
     NORMAL = "NORMAL"
     HIGH_ONCE = "HIGH_ONCE"
     HIGH_ALWAYS = "HIGH_ALWAYS"
+    LIVE_DEEPSEEK = "LIVE_DEEPSEEK"
     INVALID = "INVALID"
+
+
+class LiveReviewDecision(StrEnum):
+    PASS = "PASS"
+    REVISION_REQUIRED = "REVISION_REQUIRED"
+
+
+class LiveReviewSeverity(StrEnum):
+    NONE = "NONE"
+    HIGH = "HIGH"
+
+
+class LiveReviewResponse(BaseModel):
+    """Strict schema boundary for a live reviewer decision."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision: LiveReviewDecision
+    severity: LiveReviewSeverity
+    finding: str
+    recommended_change: str
+
+    @model_validator(mode="after")
+    def decision_matches_severity(self) -> "LiveReviewResponse":
+        expected = (
+            LiveReviewSeverity.NONE
+            if self.decision == LiveReviewDecision.PASS
+            else LiveReviewSeverity.HIGH
+        )
+        if self.severity != expected:
+            raise ValueError("Live reviewer decision and severity are inconsistent")
+        return self
 
 
 class WorkflowCase(BaseModel):

@@ -118,6 +118,20 @@ def apply_one_revision(
     )
     if fallback_step not in revised.deterministic_steps:
         revised.deterministic_steps.append(fallback_step)
+    controlled_revision_steps = [
+        "If automated processing fails, stop automation and return the case to manual RFQ review.",
+        (
+            "Preserve the audit trail, notify the workflow owner, correct the failed input "
+            "or configuration, and resume only after human approval."
+        ),
+        (
+            "The Operations Manager is the responsible human owner for fallback, recovery "
+            "and final release."
+        ),
+    ]
+    for step in controlled_revision_steps:
+        if step not in revised.deterministic_steps:
+            revised.deterministic_steps.append(step)
     revised.failure_modes.append(
         "Manual fallback preserves the case and audit trace without an external commitment."
     )

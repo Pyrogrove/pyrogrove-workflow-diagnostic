@@ -36,6 +36,19 @@ def test_high_once_triggers_exactly_one_revision_then_ready_for_approval() -> No
         "manual fallback" in step.casefold()
         for step in session.recommendation.deterministic_steps
     )
+    assert (
+        "If automated processing fails, stop automation and return the case to manual RFQ review."
+        in session.recommendation.deterministic_steps
+    )
+    assert (
+        "Preserve the audit trail, notify the workflow owner, correct the failed input or "
+        "configuration, and resume only after human approval."
+        in session.recommendation.deterministic_steps
+    )
+    assert (
+        "The Operations Manager is the responsible human owner for fallback, recovery and "
+        "final release." in session.recommendation.deterministic_steps
+    )
 
 
 def test_persistent_high_after_one_revision_requires_human_adjudication() -> None:
