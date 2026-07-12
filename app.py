@@ -37,6 +37,35 @@ st.write(
     "simulated AI roles, one controlled revision and human release authority."
 )
 
+st.markdown("## How the Agentic Service Works")
+st.markdown(
+    "Workflow narrative  \n"
+    "-> Extractor role  \n"
+    "-> Human fact confirmation  \n"
+    "-> Deterministic qualification tool  \n"
+    "-> Solution Architect role  \n"
+    "-> Independent Reviewer role  \n"
+    "-> Maximum one controlled revision  \n"
+    "-> Human approval  \n"
+    "-> Downloadable report and audit trail"
+)
+
+st.markdown("### Roles, Tools and Authority")
+st.markdown(
+    "| Role or tool | Function | Authority limit |\n"
+    "| --- | --- | --- |\n"
+    "| Extractor role | Structures workflow facts | Cannot approve facts |\n"
+    "| Qualification tool | Applies ten deterministic criteria | Cannot change rules |\n"
+    "| Architect role | Proposes route and MVP scope | Cannot release recommendation |\n"
+    "| Reviewer role | Challenges recommendation | Maximum one revision |\n"
+    "| Human | Confirms facts and approves release | Final authority |"
+)
+
+st.info(
+    "Agentic does not mean uncontrolled autonomy. Roles collaborate, tools execute "
+    "deterministic rules, and humans retain authority over facts and release."
+)
+
 
 def _csv_to_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
