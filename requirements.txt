@@ -1,2 +1,9 @@
-﻿streamlit
-pydantic
+altair==6.2.2
+numpy==2.5.1
+pandas==3.0.3
+protobuf==7.35.1
+pyarrow==25.0.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+streamlit==1.59.1
+watchdog==6.0.0
