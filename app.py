@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import streamlit as st
 
 from src.pyrogrove_diagnostic.extraction import MockExtractor, MockOutputError
@@ -267,14 +265,8 @@ if session is not None:
     elif session.status == WorkflowStatus.FAILED:
         st.error(f"Failed safely: {session.failure_reason}")
     elif session.qualification is not None:
-        st.dataframe(
-            [
-                {"criterion": name, "result": result.value}
-                for name, result in session.qualification.criteria.items()
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        for name, result in session.qualification.criteria.items():
+            st.markdown(f"{name}: {result.value}")
 
     if session.status in {
         WorkflowStatus.ARCHITECTURE_DRAFT,
@@ -307,19 +299,11 @@ if session is not None:
 
     if session.findings:
         st.subheader("Reviewer findings")
-        st.dataframe(
-            [
-                {
-                    "ID": finding.finding_id,
-                    "Severity": finding.severity.value,
-                    "Requirement": finding.requirement,
-                    "Resolution": finding.resolution_status.value,
-                }
-                for finding in session.findings
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        for finding in session.findings:
+            st.markdown(
+                f"{finding.finding_id} | {finding.severity.value} | "
+                f"{finding.requirement} | {finding.resolution_status.value}"
+            )
 
     if session.status == WorkflowStatus.REVISION_REQUIRED:
         if st.button("4. Apply the one permitted controlled revision"):
@@ -367,18 +351,11 @@ if session is not None:
         )
 
     st.subheader("Visible audit-event list")
-    audit_rows: list[dict[str, Any]] = [
-        {
-            "timestamp": event.timestamp.isoformat(),
-            "actor": event.actor,
-            "action": event.action,
-            "from": event.from_status.value,
-            "to": event.to_status.value,
-            "notes": event.notes or "",
-        }
-        for event in session.audit.events
-    ]
-    st.dataframe(audit_rows, use_container_width=True, hide_index=True)
+    for event in session.audit.events:
+        st.markdown(
+            f"{event.timestamp.isoformat()} | {event.actor} | {event.action} | "
+            f"{event.from_status.value} -> {event.to_status.value} | {event.notes or ''}"
+        )
 
 st.divider()
 st.caption(
